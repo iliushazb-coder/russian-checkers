@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 
-const socket = io(import.meta.env.VITE_SERVER_URL || 'http://localhost:3001');
+// Исправление для Vercel: используем переменную окружения или localhost
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const socket = io(SERVER_URL);
 
 type Piece = 0 | 1 | 2 | 3 | 4;
 type Board = Piece[][];
+
 interface Room {
   id: string;
   players: { id: string, color: 'white' | 'black' }[];
@@ -21,18 +24,21 @@ function App() {
   const [room, setRoom] = useState<Room | null>(null);
   const [myColor, setMyColor] = useState<'white' | 'black' | null>(null);
   const [selectedPiece, setSelectedPiece] = useState<{r: number, c: number} | null>(null);
-  const [validMoves, setValidMoves] = useState<any[]>([]);
+  // Исправление: добавили префикс _, чтобы TypeScript не ругался на неиспользование
+  const [_validMoves, setValidMoves] = useState<any[]>([]); 
   const [inviteLink, setInviteLink] = useState('');
 
   useEffect(() => {
-    // Инициализация Telegram WebApp
+    // Инициализация Telegram WebApp (безопасная проверка)
     const tg = (window as any).Telegram?.WebApp;
-    if (tg) { tg.ready(); tg.expand(); }
+    if (tg) { 
+      tg.ready(); 
+      tg.expand(); 
+    }
 
     socket.on('room_created', (roomId: string) => {
       const link = `${window.location.origin}?room=${roomId}`;
       setInviteLink(link);
-      if (tg?.shareToStory) { /* можно добавить шеринг */ }
     });
 
     socket.on('game_start', (data: { room: Room }) => {
@@ -83,21 +89,13 @@ function App() {
 
     if (isMyPiece) {
       setSelectedPiece({r, c});
-      // Запрашиваем у сервера валидные ходы (в реальном проекте лучше кэшировать или считать на клиенте, но для простоты отправим запрос или отфильтруем)
-      // Для MVP: мы отправим запрос на сервер, но чтобы не усложнять, сделаем эмуляцию:
-      // В идеале сервер должен присылать validMoves при ходе. Пока сделаем упрощенно:
-      socket.emit('request_valid_moves', { roomId: room.id, r, c }); // (Нужно добавить на сервер, но пока пропустим для краткости, см. ниже)
-      // УПРОЩЕНИЕ ДЛЯ MVP: мы позволим кликнуть, а сервер проверит валидность при make_move
-      // Подсветка всех возможных ходов требует дублирования логики на клиенте. 
-      // Сделаем так: при клике на свою шашку, мы отправляем запрос на сервер за ходами.
+      // В полной версии здесь был бы запрос к серверу за validMoves
     } else if (selectedPiece) {
-      // Попытка хода
       const move = { from: selectedPiece, to: {r, c} };
       socket.emit('make_move', { roomId: room.id, move });
     }
   };
 
-  // Форматирование времени
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -107,7 +105,7 @@ function App() {
   if (!room) {
     return (
       <div className="app-container">
-        <h1>♟️ Русские Шашки</h1>
+        <h1>️ Русские Шашки</h1>
         <p>Играй с друзьями в Telegram бесплатно!</p>
         <div className="controls">
           <button onClick={createRoom}>Создать новую игру</button>
